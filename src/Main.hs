@@ -27,14 +27,18 @@ data Position = UpLeft | DownRight
 
 collage
   :: Array arr RGBA e
-  => RandomGen g => [Image arr RGBA e] -> (Int, Int) -> g -> Image arr RGBA e
-collage _      (0, 0) _ = blank (0, 0)
+  => RandomGen g
+  => [Image arr RGBA e]
+  -> (Int, Int)
+  -> (Int, Int)
+  -> g
+  -> Image arr RGBA e
 -- Select a random image
 -- and fill the remaining space
 -- with a collage of random images.
-collage images (w, h) g = superimpose (oy, ox)
-                                      (collage images (w', h') g'')
-                                      base where
+collage images (wt, ht) (w, h) g
+  | w <= wt || h <= ht = blank (w, h)
+  | otherwise = superimpose (oy, ox) (collage images (wt, ht) (w', h') g'') base where
   (image   , g'      ) = first (fit (w, h)) $ choose images g
   (ih      , iw      ) = dims image
   (pos     , g''     ) = choose [UpLeft, DownRight] g'
@@ -70,12 +74,18 @@ fit (w, h) image = resize Bilinear Edge (nh, nw) image where
 main :: IO ()
 main = do
   args <- getArgs
-  let nArgs      = length args
-      w          = read $ head args
-      h          = read $ head $ drop 1 args
-      imagePaths = take (nArgs - 2 - 1) $ drop 2 args
-      outputPath = last args
+  let nArgs            = length args
+      w                = read $ head args
+      h                = read $ head $ drop 1 args
+      imagePaths       = take (nArgs - 2 - 1) $ drop 2 args
+      outputPath       = last args
+
+      thresholdPercent = 0.05
+      threshold'       = threshold thresholdPercent
 
   images <- sequence $ map (readImageRGBA VU) imagePaths
   g      <- getStdGen
-  writeImage outputPath $ collage images (w, h) g
+  writeImage outputPath $ collage images (threshold' w, threshold' h) (w, h) g
+ where
+  threshold :: RealFrac a => Integral b => a -> b -> b
+  threshold tp x = ceiling $ tp * fromIntegral x
