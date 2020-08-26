@@ -5,7 +5,7 @@
 }) {}) }:
 
 pkgs.stdenv.mkDerivation {
-  pname = "haskell-pbil";
+  pname = "random-collage";
   version = "1.0.0";
 
   src = ./.;
@@ -25,7 +25,7 @@ pkgs.stdenv.mkDerivation {
       -isrc \
       -O2 \
       -outputdir build \
-      -o build/haskell-pbil \
+      -o build/random-collage \
       src/Main.hs
   '';
 
@@ -43,7 +43,7 @@ pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/bin
-    mv build/haskell-pbil $out/bin/
+    mv build/random-collage $out/bin/
   '';
 
   shellHook = ''
