@@ -13,11 +13,11 @@ import           Graphics.Image                 ( Array
                                                 , Border(..)
                                                 , Image
                                                 , Pixel(..)
-                                                , RGBA
-                                                , VU(..)
+                                                , RGB
+                                                , VS(..)
                                                 , dims
                                                 , makeImage
-                                                , readImageRGBA
+                                                , readImageRGB
                                                 , resize
                                                 , superimpose
                                                 , writeImage
@@ -31,7 +31,7 @@ collage
   -> (Int, Int)
   -> (Int, Int)
   -> g
-  -> IO (Image VU RGBA Double)
+  -> IO (Image VS RGB Double)
 -- Select a random image
 -- and fill the remaining space
 -- with a collage of random images.
@@ -39,7 +39,7 @@ collage imagePaths (wt, ht) (w, h) g
   | w <= wt || h <= ht = pure $ blank (w, h)
   | otherwise = do
     let (imagePath, g') = choose imagePaths g
-    image' <- readImageRGBA VU imagePath
+    image' <- readImageRGB VS imagePath
 
     let image = fit (w, h) image'
         (ih      , iw      ) = dims image
@@ -63,8 +63,8 @@ collage imagePaths (wt, ht) (w, h) g
     fillImage <- collage imagePaths (wt, ht) (w', h') g''
     pure $ superimpose (oy, ox) fillImage base
 
-blank :: Array arr RGBA e => (Int, Int) -> Image arr RGBA e
-blank (w, h) = makeImage (h, w) (\_ -> PixelRGBA 0 0 0 0)
+blank :: Array arr RGB e => (Int, Int) -> Image arr RGB e
+blank (w, h) = makeImage (h, w) (\_ -> PixelRGB 0 0 0)
 
 choose :: RandomGen g => [a] -> g -> (a, g)
 choose xs g = (xs !! i, g') where (i, g') = randomR (0, length xs - 1) g
