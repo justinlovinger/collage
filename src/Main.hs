@@ -26,35 +26,42 @@ import           Graphics.Image                 ( Array
 data Position = UpLeft | DownRight
 
 collage
-  :: Array arr RGBA e
-  => RandomGen g
-  => [Image arr RGBA e]
+  :: RandomGen g
+  => [FilePath]
   -> (Int, Int)
   -> (Int, Int)
   -> g
-  -> Image arr RGBA e
+  -> IO (Image VU RGBA Double)
 -- Select a random image
 -- and fill the remaining space
 -- with a collage of random images.
-collage images (wt, ht) (w, h) g
-  | w <= wt || h <= ht = blank (w, h)
-  | otherwise = superimpose (oy, ox) (collage images (wt, ht) (w', h') g'') base where
-  (image   , g'      ) = first (fit (w, h)) $ choose images g
-  (ih      , iw      ) = dims image
-  (pos     , g''     ) = choose [UpLeft, DownRight] g'
-  ((ix, iy), (ox, oy)) = case pos of
-    -- If chosen image takes width of canvas,
-    -- shift remaining images down.
-    -- Otherwise,
-    -- shift remaining images right.
-    UpLeft    -> ((0, 0), if iw == w then (0, ih) else (iw, 0))
-    DownRight -> ((h - ih, w - iw), (0, 0))
-  base     = superimpose (ix, iy) image (blank (w, h))
-  -- If chosen image takes width of canvas,
-  -- then we have a horizontal slice to work with.
-  -- Otherwise,
-  -- we have a vertical slice.
-  (w', h') = if iw == w then (w, h - ih) else (w - iw, h)
+collage imagePaths (wt, ht) (w, h) g
+  | w <= wt || h <= ht = pure $ blank (w, h)
+  | otherwise = do
+    let (imagePath, g') = choose imagePaths g
+    image' <- readImageRGBA VU imagePath
+
+    let image = fit (w, h) image'
+        (ih      , iw      ) = dims image
+
+        (pos     , g''     ) = choose [UpLeft, DownRight] g'
+        ((ix, iy), (ox, oy)) = case pos of
+          -- If chosen image takes width of canvas,
+          -- shift remaining images down.
+          -- Otherwise,
+          -- shift remaining images right.
+          UpLeft    -> ((0, 0), if iw == w then (0, ih) else (iw, 0))
+          DownRight -> ((h - ih, w - iw), (0, 0))
+        -- If chosen image takes width of canvas,
+        -- then we have a horizontal slice to work with.
+        -- Otherwise,
+        -- we have a vertical slice.
+        (w', h') = if iw == w then (w, h - ih) else (w - iw, h)
+
+        base     = superimpose (ix, iy) image (blank (w, h))
+
+    fillImage <- collage imagePaths (wt, ht) (w', h') g''
+    pure $ superimpose (oy, ox) fillImage base
 
 blank :: Array arr RGBA e => (Int, Int) -> Image arr RGBA e
 blank (w, h) = makeImage (h, w) (\_ -> PixelRGBA 0 0 0 0)
@@ -83,9 +90,9 @@ main = do
       thresholdPercent = 0.05
       threshold'       = threshold thresholdPercent
 
-  images <- sequence $ map (readImageRGBA VU) imagePaths
-  g      <- getStdGen
-  writeImage outputPath $ collage images (threshold' w, threshold' h) (w, h) g
+  g        <- getStdGen
+  outImage <- collage imagePaths (threshold' w, threshold' h) (w, h) g
+  writeImage outputPath outImage
  where
   threshold :: RealFrac a => Integral b => a -> b -> b
   threshold tp x = ceiling $ tp * fromIntegral x
