@@ -33,40 +33,33 @@ collage
   -> (Int, Int)
   -> g
   -> IO (Image VS RGB Double)
--- Select a random image
--- and fill the remaining space
--- with a collage of random images.
 collage imagePaths (wt, ht) (w, h) g
   | w <= wt || h <= ht = pure $ blank (w, h)
   | otherwise = do
-      let ((ga, gb), gc) = first split $ split g
+    let ((ga, gb), gc) = first split $ split g
 
-      imageA' <- readImageRGB VS $ choose imagePaths ga
-      let imageA   = fit (w, h) imageA'
-          (ah, aw) = dims imageA
+    -- Select a random image
+    -- and fill the remaining space
+    -- with a collage of random images.
+    imageA <- (pure . fit (w, h)) =<< (readImageRGB VS $ choose imagePaths ga)
+    imageB <- collage imagePaths (wt, ht) (remaining (w, h) imageA) gb
 
-      -- If `imageA` takes width of canvas,
-      -- then we have a horizontal slice to work with.
-      -- Otherwise,
-      -- we have a vertical slice.
-      imageB <- collage
-        imagePaths
-        (wt, ht)
-        (if aw == w then (w, h - ah) else (w - aw, h))
-        gb
+    pure $ case choose [UpLeft, DownRight] gc of
+      UpLeft ->
+        combine (w, h) (0, 0) imageA (posDownRight (w, h) imageB) imageB
+      DownRight ->
+        combine (w, h) (posDownRight (w, h) imageA) imageA (0, 0) imageB
+ where
+  -- If `image` takes width of canvas,
+  -- a horizontal slice remains.
+  -- Otherwise, a vertical slice remains.
+  remaining (w, h) image = if w' == w then (w, h - h') else (w - w', h)
+    where (h', w') = dims image
 
-      pure $ case choose [UpLeft, DownRight] gc of
-        -- If `imageA` takes width of canvas,
-        -- shift `imageB` down.
-        -- Otherwise,
-        -- shift `imageB` right.
-        UpLeft    -> combine (w, h) (0, 0) imageA (if aw == w then (0, ah) else (aw, 0)) imageB
-        DownRight -> combine (w, h) (w - aw, h - ah) imageA (0, 0) imageB
-    where
-      combine (w, h) (ax, ay) imageA (bx, by) imageB =
-        superimpose (by, bx) imageB $
-          superimpose (ay, ax) imageA $
-            blank (w, h)
+  posDownRight (w, h) image = (w - w', h - h') where (h', w') = dims image
+
+  combine (w, h) (ax, ay) imageA (bx, by) imageB =
+    superimpose (by, bx) imageB $ superimpose (ay, ax) imageA $ blank (w, h)
 
 blank :: Array arr RGB e => (Int, Int) -> Image arr RGB e
 blank (w, h) = makeImage (h, w) (\_ -> PixelRGB 0 0 0)
