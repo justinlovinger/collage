@@ -3,6 +3,7 @@
 module Main where
 
 import           Data.Bifunctor                 ( first )
+import           Numeric                        ( showFFloat )
 import           System.Environment             ( getArgs )
 import           System.Random                  ( RandomGen
                                                 , getStdGen
@@ -39,8 +40,10 @@ import           Options.Applicative            ( Parser
                                                 , option
                                                 , progDesc
                                                 , short
+                                                , showDefaultWith
                                                 , some
                                                 , str
+                                                , value
                                                 )
 
 data Position = UpLeft | DownRight
@@ -103,6 +106,7 @@ data Args = Args
   , outputPath :: FilePath
   , width :: Int
   , height :: Int
+  , thresholdPercent :: Double
   }
 
 main :: IO ()
@@ -112,9 +116,7 @@ main = do
     (fullDesc <> header "collage - create an image collage" <> progDesc
       "Create a collage of images randomly chosen from SOURCE"
     )
-
-  let thresholdPercent = 0.05
-      threshold'       = threshold thresholdPercent
+  let threshold' = threshold (thresholdPercent args)
 
   g        <- getStdGen
   outImage <- collage (PixelRGB 0 0 0)
@@ -151,11 +153,27 @@ main = do
             (short 'h' <> long "height" <> metavar "HEIGHT" <> help
               "Height of collage image"
             )
+      <*> option
+            doubleIn01
+            (  long "threshold"
+            <> metavar "PERCENT"
+            <> help "Percent of blank space allowed in collage"
+            <> showDefaultWith (\x -> showFFloat Nothing x "")
+            <> value 0.05
+            )
    where
+    doubleIn01 :: ReadM Double
+    doubleIn01 = eitherReader $ \arg -> case reads arg of
+      [(x, "")] -> if x > 0 && x < 1
+        then return x
+        else Left $ "value `" ++ arg ++ "' must be between 0 and 1, exclusive"
+      _ ->
+        Left $ "value `" ++ arg ++ "' must be number between 0 and 1, exclusive"
+
     positiveInt :: ReadM Int
     positiveInt = eitherReader $ \arg -> case reads arg of
-      [(r, "")] -> if r > 0
-        then return r
+      [(x, "")] -> if x > 0
+        then return x
         else Left $ "value `" ++ arg ++ "' must be positive"
       _ -> Left $ "value `" ++ arg ++ "' must be positive integer"
 
