@@ -12,6 +12,7 @@ pkgs.stdenv.mkDerivation {
 
   nativeBuildInputs = [ (pkgs.haskellPackages.ghcWithPackages (hpkgs: with hpkgs; [
     hip
+    optparse-applicative
     random
   ])) ];
 
@@ -25,7 +26,7 @@ pkgs.stdenv.mkDerivation {
       -isrc \
       -O2 \
       -outputdir build \
-      -o build/random-collage \
+      -o build/collage \
       src/Main.hs
   '';
 
@@ -43,7 +44,7 @@ pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/bin
-    mv build/random-collage $out/bin/
+    mv build/collage $out/bin/
   '';
 
   shellHook = ''

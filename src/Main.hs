@@ -23,6 +23,25 @@ import           Graphics.Image                 ( Array
                                                 , superimpose
                                                 , writeImage
                                                 )
+import           Options.Applicative            ( Parser
+                                                , ReadM
+                                                , (<**>)
+                                                , argument
+                                                , eitherReader
+                                                , execParser
+                                                , fullDesc
+                                                , header
+                                                , help
+                                                , helper
+                                                , info
+                                                , long
+                                                , metavar
+                                                , option
+                                                , progDesc
+                                                , short
+                                                , some
+                                                , str
+                                                )
 
 data Position = UpLeft | DownRight
 
@@ -79,25 +98,66 @@ fit (w, h) image = resize Bilinear Edge (nh, nw) image where
     then (w, round $ fromIntegral ih / rw)
     else (round $ fromIntegral iw / rh, h)
 
+data Args = Args
+  { imagePaths :: [FilePath]
+  , outputPath :: FilePath
+  , width :: Int
+  , height :: Int
+  }
+
 main :: IO ()
 main = do
-  args <- getArgs
-  let nArgs            = length args
-      w                = read $ head args
-      h                = read $ head $ drop 1 args
-      imagePaths       = take (nArgs - 2 - 1) $ drop 2 args
-      outputPath       = last args
+  args <- execParser $ info
+    (argsParser <**> helper)
+    (fullDesc <> header "collage - create an image collage" <> progDesc
+      "Create a collage of images randomly chosen from SOURCE"
+    )
 
-      thresholdPercent = 0.05
+  let thresholdPercent = 0.05
       threshold'       = threshold thresholdPercent
 
   g        <- getStdGen
   outImage <- collage (PixelRGB 0 0 0)
-                      imagePaths
-                      (threshold' w, threshold' h)
-                      (w           , h)
+                      (imagePaths args)
+                      (threshold' (width args), threshold' (height args))
+                      (width args             , height args)
                       g
-  writeImage outputPath outImage
+  writeImage (outputPath args) outImage
  where
+  argsParser :: Parser Args
+  argsParser =
+    Args
+      <$> some
+            (argument
+              str
+              (metavar "SOURCE..." <> help "Images available for collage")
+            )
+      -- As of 2020-08-28,
+      -- 'optparse-applicative' does not support `some argument`
+      -- followed by `argument`:
+      -- <https://github.com/pcapriotti/optparse-applicative/issues/163>.
+      <*> option
+            str
+            (short 't' <> long "target" <> metavar "DEST" <> help
+              "Destination of collage image"
+            )
+      <*> option
+            positiveInt
+            (short 'w' <> long "width" <> metavar "WIDTH" <> help
+              "Width of collage image"
+            )
+      <*> option
+            positiveInt
+            (short 'h' <> long "height" <> metavar "HEIGHT" <> help
+              "Height of collage image"
+            )
+   where
+    positiveInt :: ReadM Int
+    positiveInt = eitherReader $ \arg -> case reads arg of
+      [(r, "")] -> if r > 0
+        then return r
+        else Left $ "value `" ++ arg ++ "' must be positive"
+      _ -> Left $ "value `" ++ arg ++ "' must be positive integer"
+
   threshold :: RealFrac a => Integral b => a -> b -> b
   threshold tp x = ceiling $ tp * fromIntegral x
