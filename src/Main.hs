@@ -3,6 +3,9 @@
 module Main where
 
 import           Data.Bifunctor                 ( first )
+import           Data.Char                      ( digitToInt
+                                                , isHexDigit
+                                                )
 import           Numeric                        ( showFFloat )
 import           System.Environment             ( getArgs )
 import           System.Random                  ( RandomGen
@@ -40,6 +43,7 @@ import           Options.Applicative            ( Parser
                                                 , option
                                                 , progDesc
                                                 , short
+                                                , showDefault
                                                 , showDefaultWith
                                                 , some
                                                 , str
@@ -106,6 +110,7 @@ data Args = Args
   , outputPath :: FilePath
   , width :: Int
   , height :: Int
+  , fillColor :: String
   , thresholdPercent :: Double
   }
 
@@ -119,7 +124,7 @@ main = do
   let threshold' = threshold (thresholdPercent args)
 
   g        <- getStdGen
-  outImage <- collage (PixelRGB 0 0 0)
+  outImage <- collage (readHexColor $ fillColor args)
                       (imagePaths args)
                       (threshold' (width args), threshold' (height args))
                       (width args             , height args)
@@ -154,6 +159,15 @@ main = do
               "Height of collage image"
             )
       <*> option
+            hexColor
+            (  short 'c'
+            <> long "fill-color"
+            <> metavar "HEXCODE"
+            <> help "Color to fill blank space in collage"
+            <> showDefault
+            <> value "#000000"
+            )
+      <*> option
             doubleIn01
             (  long "threshold"
             <> metavar "PERCENT"
@@ -170,12 +184,30 @@ main = do
       _ ->
         Left $ "value `" ++ arg ++ "' must be number between 0 and 1, exclusive"
 
+    hexColor :: ReadM String
+    hexColor = eitherReader $ \arg ->
+      if length arg == 7 && head arg == '#' && all isHexDigit (tail arg)
+        then return arg
+        else Left $ "value `" ++ arg ++ "' must be hex color code"
+
     positiveInt :: ReadM Int
     positiveInt = eitherReader $ \arg -> case reads arg of
       [(x, "")] -> if x > 0
         then return x
         else Left $ "value `" ++ arg ++ "' must be positive"
       _ -> Left $ "value `" ++ arg ++ "' must be positive integer"
+
+  readHexColor :: String -> Pixel RGB Double
+  readHexColor s = PixelRGB (fromHexPair $ slice 1 2 s)
+                            (fromHexPair $ slice 3 4 s)
+                            (fromHexPair $ slice 5 6 s)
+   where
+    fromHexPair :: [Char] -> Double
+    fromHexPair (h1 : h2 : _) =
+      (fromIntegral $ 16 * digitToInt h1 + digitToInt h2) / 255
+
+    slice :: Int -> Int -> [a] -> [a]
+    slice a b = take (1 + b - a) . drop a
 
   threshold :: RealFrac a => Integral b => a -> b -> b
   threshold tp x = ceiling $ tp * fromIntegral x
