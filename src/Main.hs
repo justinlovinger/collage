@@ -28,13 +28,14 @@ data Position = UpLeft | DownRight
 
 collage
   :: RandomGen g
-  => [FilePath]
+  => Pixel RGB Double
+  -> [FilePath]
   -> (Int, Int)
   -> (Int, Int)
   -> g
   -> IO (Image VS RGB Double)
-collage imagePaths (wt, ht) (w, h) g
-  | w <= wt || h <= ht = pure $ blank (w, h)
+collage fillPx imagePaths (wt, ht) (w, h) g
+  | w <= wt || h <= ht = pure $ fill' (w, h)
   | otherwise = do
     let ((ga, gb), gc) = first split $ split g
 
@@ -42,7 +43,7 @@ collage imagePaths (wt, ht) (w, h) g
     -- and fill the remaining space
     -- with a collage of random images.
     imageA <- (pure . fit (w, h)) =<< (readImageRGB VS $ choose imagePaths ga)
-    imageB <- collage imagePaths (wt, ht) (remaining (w, h) imageA) gb
+    imageB <- collage fillPx imagePaths (wt, ht) (remaining (w, h) imageA) gb
 
     pure $ case choose [UpLeft, DownRight] gc of
       UpLeft ->
@@ -59,10 +60,12 @@ collage imagePaths (wt, ht) (w, h) g
   posDownRight (w, h) image = (w - w', h - h') where (h', w') = dims image
 
   combine (w, h) (ax, ay) imageA (bx, by) imageB =
-    superimpose (by, bx) imageB $ superimpose (ay, ax) imageA $ blank (w, h)
+    superimpose (by, bx) imageB $ superimpose (ay, ax) imageA $ fill' (w, h)
 
-blank :: Array arr RGB e => (Int, Int) -> Image arr RGB e
-blank (w, h) = makeImage (h, w) (\_ -> PixelRGB 0 0 0)
+  fill' = fill fillPx
+
+fill :: Array arr cs e => Pixel cs e -> (Int, Int) -> Image arr cs e
+fill px (w, h) = makeImage (h, w) (\_ -> px)
 
 choose :: RandomGen g => [a] -> g -> a
 choose xs g = xs !! (fst $ randomR (0, length xs - 1) g)
@@ -89,7 +92,11 @@ main = do
       threshold'       = threshold thresholdPercent
 
   g        <- getStdGen
-  outImage <- collage imagePaths (threshold' w, threshold' h) (w, h) g
+  outImage <- collage (PixelRGB 0 0 0)
+                      imagePaths
+                      (threshold' w, threshold' h)
+                      (w           , h)
+                      g
   writeImage outputPath outImage
  where
   threshold :: RealFrac a => Integral b => a -> b -> b
