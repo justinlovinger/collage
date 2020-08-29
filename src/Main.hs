@@ -45,7 +45,6 @@ import           Options.Applicative            ( Parser
                                                 , progDesc
                                                 , short
                                                 , showDefault
-                                                , showDefaultWith
                                                 , some
                                                 , str
                                                 , value
@@ -156,7 +155,8 @@ data Args = Args
   , width :: Int
   , height :: Int
   , fillColor :: String
-  , thresholdPercent :: Double
+  , thresholdWidth :: Int
+  , thresholdHeight :: Int
   }
 
 main :: IO ()
@@ -166,13 +166,12 @@ main = do
     (fullDesc <> header "collage - create an image collage" <> progDesc
       "Create a collage of images randomly chosen from SOURCE"
     )
-  let threshold' = threshold (thresholdPercent args)
 
   g        <- getStdGen
   outImage <- collage (readHexColor $ fillColor args)
                       (imagePaths args)
-                      (threshold' (width args), threshold' (height args))
-                      (width args             , height args)
+                      (thresholdWidth args, thresholdHeight args)
+                      (width args         , height args)
                       g
   writeImage (outputPath args) outImage
  where
@@ -213,22 +212,22 @@ main = do
             <> value "#000000"
             )
       <*> option
-            doubleIn01
-            (  long "threshold"
-            <> metavar "PERCENT"
-            <> help "Percent of blank space allowed in collage"
-            <> showDefaultWith (\x -> showFFloat Nothing x "")
-            <> value 0.05
+            positiveInt
+            (  long "threshold-width"
+            <> metavar "WIDTH"
+            <> help "Horizontal blank space allowed in collage"
+            <> showDefault
+            <> value 50
+            )
+      <*> option
+            positiveInt
+            (  long "threshold-height"
+            <> metavar "HEIGHT"
+            <> help "Vertical blank space allowed in collage"
+            <> showDefault
+            <> value 50
             )
    where
-    doubleIn01 :: ReadM Double
-    doubleIn01 = eitherReader $ \arg -> case reads arg of
-      [(x, "")] -> if x > 0 && x < 1
-        then return x
-        else Left $ "value `" ++ arg ++ "' must be between 0 and 1, exclusive"
-      _ ->
-        Left $ "value `" ++ arg ++ "' must be number between 0 and 1, exclusive"
-
     hexColor :: ReadM String
     hexColor = eitherReader $ \arg ->
       if length arg == 7 && head arg == '#' && all isHexDigit (tail arg)
@@ -253,6 +252,3 @@ main = do
 
     slice :: Int -> Int -> [a] -> [a]
     slice a b = take (1 + b - a) . drop a
-
-  threshold :: RealFrac a => Integral b => a -> b -> b
-  threshold tp x = ceiling $ tp * fromIntegral x
