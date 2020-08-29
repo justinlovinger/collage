@@ -6,6 +6,7 @@ import           Data.Bifunctor                 ( first )
 import           Data.Char                      ( digitToInt
                                                 , isHexDigit
                                                 )
+import           Data.Tuple                     ( swap )
 import           Numeric                        ( showFFloat )
 import           System.Environment             ( getArgs )
 import           System.Random                  ( RandomGen
@@ -61,18 +62,19 @@ collage
   -> g
   -> IO (Image VS RGB Double)
 collage fillPx imagePaths thresh = go where
-  go size g
-    | cmpTup (||) (<=) size thresh = pure
-    $ fill' (max 1 $ fst size, max 1 $ snd size)
-    | otherwise = do
-      let ((ga, gb), gc) = first split $ split g
+  go size g = do
+    let ((ga, gb), gc) = first split $ split g
 
-      -- Select a random image
-      -- and fill the remaining space
-      -- with a collage of random images.
-      imageA <- (pure . fit size) =<< (readImageRGB VS $ choose imagePaths ga)
+    -- Select a random image
+    -- and fill the remaining space
+    -- with a collage of random images.
+    imageA <- (pure . fit size) =<< (readImageRGB VS $ choose imagePaths ga)
 
-      case
+    -- Center the last image.
+    if cmpTup (||) (<=) (remaining size imageA) thresh
+      then pure $ superimpose (swap $ posCenter size imageA) imageA $ fill' size
+      else
+        case
           choose
             (  [UpLeft, DownRight]
             ++ if cmpTup (&&)
