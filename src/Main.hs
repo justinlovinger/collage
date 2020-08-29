@@ -50,7 +50,7 @@ import           Options.Applicative            ( Parser
                                                 , value
                                                 )
 
-data Position = UpLeft | DownRight
+data Position = Center | UpLeft | DownRight
 
 collage
   :: RandomGen g
@@ -60,29 +60,72 @@ collage
   -> (Int, Int)
   -> g
   -> IO (Image VS RGB Double)
-collage fillPx imagePaths (wt, ht) (w, h) g
-  | w <= wt || h <= ht = pure $ fill' (w, h)
-  | otherwise = do
-    let ((ga, gb), gc) = first split $ split g
+collage fillPx imagePaths thresh = go where
+  go size g
+    | cmpTup (||) (<=) size thresh = pure
+    $ fill' (max 1 $ fst size, max 1 $ snd size)
+    | otherwise = do
+      let ((ga, gb), gc) = first split $ split g
 
-    -- Select a random image
-    -- and fill the remaining space
-    -- with a collage of random images.
-    imageA <- (pure . fit (w, h)) =<< (readImageRGB VS $ choose imagePaths ga)
-    imageB <- collage fillPx imagePaths (wt, ht) (remaining (w, h) imageA) gb
+      -- Select a random image
+      -- and fill the remaining space
+      -- with a collage of random images.
+      imageA <- (pure . fit size) =<< (readImageRGB VS $ choose imagePaths ga)
 
-    pure $ case choose [UpLeft, DownRight] gc of
-      UpLeft ->
-        combine (w, h) (0, 0) imageA (posDownRight (w, h) imageB) imageB
-      DownRight ->
-        combine (w, h) (posDownRight (w, h) imageA) imageA (0, 0) imageB
- where
+      case
+          choose
+            (  [UpLeft, DownRight]
+            ++ if cmpTup (&&)
+                         (cmpTup (&&) (>))
+                         (remainingHalves size imageA)
+                         (thresh, thresh)
+                 then [Center]
+                 else []
+            )
+            gb
+        of
+          Center -> do
+            let (sizeB, sizeC) = remainingHalves size imageA
+                (gca  , gcb  ) = split gc
+            imageB <- go sizeB gca
+            imageC <- go sizeC gcb
+            pure $ superimpose (0, 0) imageB $ combine
+              size
+              (posCenter size imageA)
+              imageA
+              (posDownRight size imageC)
+              imageC
+          UpLeft -> do
+            imageB <- go (remaining size imageA) gc
+            pure $ combine size (0, 0) imageA (posDownRight size imageB) imageB
+          DownRight -> do
+            imageB <- go (remaining size imageA) gc
+            pure $ combine size (posDownRight size imageA) imageA (0, 0) imageB
+
+  cmpTup
+    :: (Bool -> Bool -> Bool) -> (a -> a -> Bool) -> (a, a) -> (a, a) -> Bool
+  cmpTup comb pred ta tb = pred (fst ta) (fst tb) `comb` pred (snd ta) (snd tb)
+
   -- If `image` takes width of canvas,
   -- a horizontal slice remains.
   -- Otherwise, a vertical slice remains.
   remaining (w, h) image = if w' == w then (w, h - h') else (w - w', h)
     where (h', w') = dims image
+  -- Note: `posCenter` and `remainingHalves` are coordinated
+  -- such that the first of `remainingHalves` is the space on the up left
+  -- of the centered image
+  -- and the second of `remainingHalves` is the space on the down right
+  -- of the centered image.
+  remainingHalves (w, h) image = if w' == w
+    then
+      let h'' = fromIntegral (h - h') / 2 in ((w, ceiling h''), (w, floor h''))
+    else
+      let w'' = fromIntegral (w - w') / 2 in ((ceiling w'', h), (floor w'', h))
+    where (h', w') = dims image
 
+  posCenter size image = (f w, f h)   where
+    f x = ceiling $ fromIntegral x / 2
+    (w, h) = posDownRight size image
   posDownRight (w, h) image = (w - w', h - h') where (h', w') = dims image
 
   combine (w, h) (ax, ay) imageA (bx, by) imageB =
