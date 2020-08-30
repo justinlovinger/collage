@@ -67,7 +67,7 @@ collage fillPx imagePaths thresh = go where
     -- Select a random image
     -- and fill the remaining space
     -- with a collage of random images.
-    imageA <- (pure . fit size) =<< (readImageRGB VS $ choose imagePaths ga)
+    imageA <- (pure . fit size) =<< readImageRGB VS (choose imagePaths ga)
 
     -- Center the last image.
     if cmpTup (||) (<=) (remaining size imageA) thresh
@@ -76,12 +76,13 @@ collage fillPx imagePaths thresh = go where
         case
           choose
             (  [UpLeft, DownRight]
-            ++ if cmpTup (&&)
+            ++ ([ Center
+                | cmpTup (&&)
                          (cmpTup (&&) (>))
                          (remainingHalves size imageA)
                          (thresh, thresh)
-                 then [Center]
-                 else []
+                ]
+               )
             )
             gb
         of
@@ -135,10 +136,10 @@ collage fillPx imagePaths thresh = go where
   fill' = fill fillPx
 
 fill :: Array arr cs e => Pixel cs e -> (Int, Int) -> Image arr cs e
-fill px (w, h) = makeImage (h, w) (\_ -> px)
+fill px (w, h) = makeImage (h, w) (const px)
 
 choose :: RandomGen g => [a] -> g -> a
-choose xs g = xs !! (fst $ randomR (0, length xs - 1) g)
+choose xs g = xs !! fst (randomR (0, length xs - 1) g)
 
 fit :: Array arr cs e => (Int, Int) -> Image arr cs e -> Image arr cs e
 fit (w, h) image = resize Bilinear Edge (nh, nw) image where
@@ -246,9 +247,9 @@ main = do
                             (fromHexPair $ slice 3 4 s)
                             (fromHexPair $ slice 5 6 s)
    where
-    fromHexPair :: [Char] -> Double
+    fromHexPair :: String -> Double
     fromHexPair (h1 : h2 : _) =
-      (fromIntegral $ 16 * digitToInt h1 + digitToInt h2) / 255
+      fromIntegral (16 * digitToInt h1 + digitToInt h2) / 255
 
     slice :: Int -> Int -> [a] -> [a]
     slice a b = take (1 + b - a) . drop a
