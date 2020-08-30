@@ -22,7 +22,7 @@ pkgs.stdenv.mkDerivation rec {
   ];
 
   configurePhase = ''
-    rm -rf build doc result
+    rm -rf build result
   '';
 
   buildPhase = ''
@@ -34,10 +34,9 @@ pkgs.stdenv.mkDerivation rec {
       -o build/collage \
       src/Main.hs
 
-    mkdir -p doc
     ${pkgs.help2man}/bin/help2man build/collage \
       --version-string "${version}" \
-      > doc/collage.1
+      > build/collage.1
   '';
 
   # doCheck = true;
@@ -56,7 +55,18 @@ pkgs.stdenv.mkDerivation rec {
     mkdir -p $out/bin
     mv build/collage $out/bin/
 
-    installManPage doc/collage.1
+    installManPage build/collage.1
+
+    # Completion scripts need final binary path
+    # and must be built after `installPhase`.
+    $out/bin/collage --bash-completion-script $out/bin/collage \
+      > build/collage.bash
+    $out/bin/collage --fish-completion-script $out/bin/collage \
+      > build/collage.fish
+    $out/bin/collage --zsh-completion-script $out/bin/collage \
+      > build/collage.zsh
+
+    installShellCompletion build/collage.{bash,fish,zsh}
   '';
 
   shellHook = ''
