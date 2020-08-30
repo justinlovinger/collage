@@ -5,7 +5,7 @@
 }) {}) }:
 
 pkgs.stdenv.mkDerivation rec {
-  pname = "random-collage";
+  pname = "collage";
   version = "1.0.0";
 
   src = ./.;
@@ -31,12 +31,12 @@ pkgs.stdenv.mkDerivation rec {
       -isrc \
       -O2 \
       -outputdir build \
-      -o build/collage \
+      -o build/${pname} \
       src/Main.hs
 
-    ${pkgs.help2man}/bin/help2man build/collage \
+    ${pkgs.help2man}/bin/help2man build/${pname} \
       --version-string "${version}" \
-      > build/collage.1
+      > build/${pname}.1
   '';
 
   # doCheck = true;
@@ -53,20 +53,20 @@ pkgs.stdenv.mkDerivation rec {
 
   installPhase = ''
     mkdir -p $out/bin
-    mv build/collage $out/bin/
+    mv build/${pname} $out/bin/
 
-    installManPage build/collage.1
+    installManPage build/${pname}.1
 
     # Completion scripts need final binary path
     # and must be built after `installPhase`.
-    $out/bin/collage --bash-completion-script $out/bin/collage \
-      > build/collage.bash
-    $out/bin/collage --fish-completion-script $out/bin/collage \
-      > build/collage.fish
-    $out/bin/collage --zsh-completion-script $out/bin/collage \
-      > build/collage.zsh
+    $out/bin/${pname} --bash-completion-script $out/bin/${pname} \
+      > build/${pname}.bash
+    $out/bin/${pname} --fish-completion-script $out/bin/${pname} \
+      > build/${pname}.fish
+    $out/bin/${pname} --zsh-completion-script $out/bin/${pname} \
+      > build/${pname}.zsh
 
-    installShellCompletion build/collage.{bash,fish,zsh}
+    installShellCompletion build/${pname}.{bash,fish,zsh}
   '';
 
   shellHook = ''
