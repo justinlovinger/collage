@@ -74,4 +74,11 @@ pkgs.stdenv.mkDerivation rec {
     ${pkgs.haskellPackages.haskell-language-server}/bin:\
     $PATH
   '';
+
+  meta = with pkgs.stdenv.lib; {
+    description = "Create a collage of semi-random images";
+    homepage = "https://github.com/JustinLovinger/collage";
+    license = licenses.mit;
+    maintainers = [ ];
+  };
 }
