@@ -75,7 +75,7 @@ pkgs.stdenv.mkDerivation rec {
     $PATH
   '';
 
-  meta = with pkgs.stdenv.lib; {
+  meta = with pkgs.lib; {
     description = "Create a collage of semi-random images";
     homepage = "https://github.com/JustinLovinger/collage";
     license = licenses.mit;
